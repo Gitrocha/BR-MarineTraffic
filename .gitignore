@@ -117,8 +117,8 @@ vs/
 
 #Database files
 Main/database/raw
+Main/database/data
 Main/database/data/atr_info.db
-Main/database/data/
 *.csv
 *.txt
 *.db

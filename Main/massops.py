@@ -2,43 +2,79 @@ from database import connectors
 import sqlite3
 import time as t
 import random
+import pandas as pd
+from pathlib import Path
 
 
-atra = {}
-atra['idatr'] = 977343
-atra['tespatr'] = 1.0999999999185
-atra['tespin'] = 5.0000000000582
-atra['top'] = 37.250000000058
-atra['tespout'] = 8.8333333333139
-atra['ttot'] = 51.08333333343
-atra['testad'] = 52.183333333349
+def imo_query():
+
+    conn = sqlite3.connect('./Main/database/data/atr_info.db')
+
+    x = t.time()
+
+    nimo = int(input('\n Insira o Número IMO para gerar relatório: '))
+
+    result = connectors.find_imo_exact(imo=nimo, connection=conn)
+
+    if isinstance(result['Message'], str):
+        print(result['Message'])
+        rerun = input('Deseja consultar novamente? (S ou N)').lower()
+        return rerun
+
+    else:
+        df_teste = pd.DataFrame(result['Message'], columns=["IDAtracacao",
+                                                            "TEsperaAtracacao",
+                                                            "TEsperaInicioOp",
+                                                            "TOperacao",
+                                                            "TEsperaDesatracacao",
+                                                            "TAtracado",
+                                                            "TEstadia",
+                                                            "CDTUP",
+                                                            "IDBerco",
+                                                            "Berço",
+                                                            "Porto Atracação",
+                                                            "Apelido Instalação Portuária",
+                                                            "Complexo Portuário",
+                                                            "Tipo da Autoridade Portuária",
+                                                            "Data Atracação",
+                                                            "Data Chegada",
+                                                            "Data Desatracação",
+                                                            "Data Início Operação",
+                                                            "Data Término Operação",
+                                                            "Ano",
+                                                            "Mes",
+                                                            "Tipo de Operação",
+                                                            "Tipo de Navegação da Atracação",
+                                                            "Nacionalidade do Armador",
+                                                            "FlagMCOperacaoAtracacao",
+                                                            "Terminal",
+                                                            "Município",
+                                                            "UF",
+                                                            "SGUF",
+                                                            "Região Geográfica",
+                                                            "Nº da Capitania",
+                                                            "Nº do IMO"])
+
+        # print(df_test[0:5])
+
+        basepath = Path('.') / 'relatórios' / 'viagens'
+
+        df_teste.to_csv(basepath / f'viagens_{nimo}.csv', sep=';', encoding='cp1252', index=False)
+
+        conn.close()
+
+        y = t.time()
+
+        print('\n Finalizado. Tempo total de consulta = ', round((y-x), 3), 'segundos')
+
+        rerun = input('Deseja consultar novamente? (S ou N):').lower()
+        return rerun
 
 
-conn = sqlite3.connect('./Main/database/data/tempos_atr.db')
+retorno = imo_query()
+while retorno == 's':
+    retorno = imo_query()
+    print('Executando consultas novamente. (Aperte CTRL+C para sair.) \n')
 
-x = t.time()
-
-'''
-for i in range(100):
-
-    atra['idatr'] = i
-    result = connectors.add_data(atr=atra, connection=conn)
-    print(i)
-'''
-
-counter = 0
-
-for i in range(10):
-
-    id = random.randint(880000,920000)
-    result = connectors.find_atr_exact(atrid=id, connection=conn)
-    print(result)
-    counter+=1
-    #t.sleep(0.5)
-
-conn.close()
-
-y = t.time()
-
-
-print('\n Estimated time per query = ', round((y-x)/10, 3), ' seconds')
+print('Consultas Finalizadas.')
+t.sleep(5)
