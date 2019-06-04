@@ -121,6 +121,7 @@ vs/
 
 Main/database/raw
 Main/database/data
+Main/database
 *.csv
 *.txt
 
