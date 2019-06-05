@@ -55,6 +55,40 @@ def find_imo_exact(imo, connection):
     return {'Status': 'ok', 'Message': result}
 
 
+def find_imo_blank(connection):
+
+    c = connection.cursor()
+    c.execute("SELECT * FROM atrstats WHERE [Nº do IMO] IS NULL "
+              "OR [Nº do IMO] = 0 "
+              "OR [Nº do IMO] = ' ' "
+              "OR TRIM([Nº do IMO]) = ''")
+
+    #c.execute("SELECT * FROM atrstats")
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'ShipS not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+
+def count(connection):
+
+    c = connection.cursor()
+    #c.execute("SELECT * FROM atrstats WHERE [Nº do IMO] IS NULL OR [Nº do IMO] = 0 OR [Nº do IMO] = ' ' ")
+    c.execute("SELECT COUNT(*) FROM atrstats")
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'ShipS not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+
 def find_employee_close(namelike, connection):
 
     c = connection.cursor()
@@ -145,3 +179,4 @@ def remove_employee(employeeid, connection):
         message = f'There is no occurrence of id {employeeid}'
 
         return {'Status': 'error', 'Message': message}
+
