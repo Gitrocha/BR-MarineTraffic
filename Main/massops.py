@@ -4,6 +4,7 @@ import time as t
 import pandas as pd
 from pathlib import Path
 import sys
+from os import mkdir
 
 
 def print_exception():
@@ -77,12 +78,19 @@ def imo_query():
                                                             "Nº da Capitania",
                                                             "Nº do IMO"])
 
-        # print(df_test[0:5])
-
-        basepath = Path('.') / 'Reports' / 'viagens'
+        basepath = Path('.') / 'Reports' / f'IMO-{nimo}'
 
         print('\n Salvando dados...')
-        df_teste.to_csv(basepath / f'viagens_IMO-{nimo}.csv', sep=';', encoding='cp1252', index=False)
+
+        try:
+            mkdir(basepath)
+            mkdir(basepath / 'viagens')
+            mkdir(basepath / 'cargas')
+        except:
+            print('Pasta Já existe')
+            return 's'
+
+        df_teste.to_csv(basepath / 'viagens' / f'{nimo}.csv', sep=';', encoding='cp1252', index=False)
 
         print('\n Finalizado. Tempo total de consulta = ', round((y-x), 2), 'segundos')
 

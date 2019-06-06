@@ -1,32 +1,11 @@
-"IDAtracacao",
-"TEsperaAtracacao",
-"TEsperaInicioOp",
-"TOperacao",
-"TEsperaDesatracacao",
-"TAtracado",
-"TEstadia",
-"CDTUP",
-"IDBerco",
-"Berço",
-"Porto Atracação",
-"Apelido Instalação Portuária",
-"Complexo Portuário",
-"Tipo da Autoridade Portuária",
-"Data Atracação",
-"Data Chegada",
-"Data Desatracação",
-"Data Início Operação",
-"Data Término Operação",
-"Ano",
-"Mes",
-"Tipo de Operação",
-"Tipo de Navegação da Atracação",
-"Nacionalidade do Armador",
-"FlagMCOperacaoAtracacao",
-"Terminal",
-"Município",
-"UF",
-"SGUF",
-"Região Geográfica",
-"Nº da Capitania" ,
-"Nº do IMO",
+import pandas as pd
+from pathlib import Path
+
+
+basepath = Path('.') / 'Main' / 'database' / 'raw' / 'all_loads.csv'
+df = pd.read_csv(basepath, sep=',')
+nocont = df[df['Natureza da Carga'] != 'Carga Conteinerizada'][0:10]
+cont = df[df['Natureza da Carga'] == 'Carga Conteinerizada'][0:10]
+
+nocont.to_csv(Path('.') / 'Main' / 'database' / 'raw' / 'nocont.csv', sep=';', index=False)
+cont.to_csv(Path('.') / 'Main' / 'database' / 'raw' / 'cont.csv', sep=';', index=False)

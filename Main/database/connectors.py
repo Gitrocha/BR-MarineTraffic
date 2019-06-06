@@ -1,6 +1,7 @@
 '''
 Module functions to properly interact with Database
 '''
+import sqlite3
 
 
 def add_data(atr, connection):
@@ -53,6 +54,26 @@ def find_imo_exact(imo, connection):
         return result
 
     return {'Status': 'ok', 'Message': result}
+
+
+def find_load_exact(loadid, connection):
+
+    c = connection.cursor()
+    loadid = ", ".join(map(str, loadid))
+    query = f"SELECT * FROM loadstats WHERE IDCarga IN ({loadid})"
+    c.execute(query)
+
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'Load ID {loadid} not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+
+print(find_load_exact([8049372, 23338048], connection=sqlite3.connect('./Main/database/data/atr_info.db')))
 
 
 def find_imo_blank(connection):
