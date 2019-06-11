@@ -12,7 +12,7 @@ def start_database():
     conn = sqlite3.connect('./Main/database/data/atr_info.db')
     c = conn.cursor()
 
-    c.execute("""CREATE TABLE loadstats (
+    c.execute("""CREATE TABLE loadsinfo (
             IDCarga integer,
             IDAtracacao integer,
             Origem String(32767),

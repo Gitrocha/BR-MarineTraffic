@@ -19,65 +19,8 @@ for y in range(2010, 2020):
                         encoding='cp1252').fillna(0)
 
     dfaux = dfaux.astype({'IDCarga': int})
-    '''
-                          'IDAtracacao': int,
-                          'Origem': str,
-                          'Destino': str,
-                          'CDMercadoria': str,
-                          'Tipo Operação da Carga': str,
-                          'Carga Geral Acondicionamento': str,
-                          'ConteinerEstado': str,
-                          'Tipo Navegação': str,
-                          'FlagAutorizacao': str,
-                          'FlagCabotagem': int,
-                          'FlagCabotagemMovimentacao': int,
-                          'FlagConteinerTamanho': int,
-                          'FlagLongoCurso': int,
-                          'FlagMCOperacaoCarga': int,
-                          'FlagOffshore': int,
-                          'FlagTransporteViaInterioir': int,
-                          'Percurso Transporte em vias Interiores': str,
-                          'Percurso Transporte Interiores': str,
-                          'STNaturezaCarga': str,
-                          'STSH2': str,
-                          'STSH4': str,
-                          'Natureza da Carga': str,
-                          'Sentido': str,
-                          'TEU': int,
-                          'QTCarga': int,
-                          'VLPesoCargaBruta': str})
-    '''
-    full_loads[y] = dfaux
 
-    '''
-    dtype={'IDCarga': int,
-                                       'IDAtracacao': int,
-                                       'Origem': str,
-                                       'Destino': str,
-                                       'CDMercadoria': str,
-                                       'Tipo Operação da Carga': str,
-                                       'Carga Geral Acondicionamento': str,
-                                       'ConteinerEstado': str,
-                                       'Tipo Navegação': str,
-                                       'FlagAutorizacao': str,
-                                       'FlagCabotagem': int,
-                                       'FlagCabotagemMovimentacao': int,
-                                       'FlagConteinerTamanho': int,
-                                       'FlagLongoCurso': int,
-                                       'FlagMCOperacaoCarga': int,
-                                       'FlagOffshore': int,
-                                       'FlagTransporteViaInterioir': int,
-                                       'Percurso Transporte em vias Interiores': str,
-                                       'Percurso Transporte Interiores': str,
-                                       'STNaturezaCarga': str,
-                                       'STSH2': str,
-                                       'STSH4': str,
-                                       'Natureza da Carga': str,
-                                       'Sentido': str,
-                                       'TEU': int,
-                                       'QTCarga': int,
-                                       'VLPesoCargaBruta': str}
-    '''
+    full_loads[y] = dfaux
 
 
 print('df_cargas all read')
@@ -95,19 +38,7 @@ for y in range(2010, 2020):
 
     dfaux = dfaux.astype({'IDCarga': int})
 
-    '''
-                          'CDMercadoriaConteinerizada': str,
-                          'VLPesoCargaConteinerizada': float})
-    '''
     carga_cont[y] = dfaux
-
-
-    '''
-                                  dtype={'IDCarga': int,
-                                         'CDMercadoriaConteinerizada': str,
-                                         'VLPesoCargaConteinerizada': float}
-    '''
-
 
 
 print('df_conts read')
@@ -133,4 +64,40 @@ for y in range(2010, 2020):
     print(f'appended year {y}')
 
 print('saving dataframe full')
-df_full.to_csv(basepath / 'raw' / 'all_loads2.csv', sep=',', encoding='utf-8', index=False)
+df_full.to_csv(basepath / 'raw' / 'all_loads2.csv', sep=',', encoding='cp1252', index=False)
+
+
+'''
+                      'IDAtracacao': int,
+                      'Origem': str,
+                      'Destino': str,
+                      'CDMercadoria': str,
+                      'Tipo Operação da Carga': str,
+                      'Carga Geral Acondicionamento': str,
+                      'ConteinerEstado': str,
+                      'Tipo Navegação': str,
+                      'FlagAutorizacao': str,
+                      'FlagCabotagem': int,
+                      'FlagCabotagemMovimentacao': int,
+                      'FlagConteinerTamanho': int,
+                      'FlagLongoCurso': int,
+                      'FlagMCOperacaoCarga': int,
+                      'FlagOffshore': int,
+                      'FlagTransporteViaInterioir': int,
+                      'Percurso Transporte em vias Interiores': str,
+                      'Percurso Transporte Interiores': str,
+                      'STNaturezaCarga': str,
+                      'STSH2': str,
+                      'STSH4': str,
+                      'Natureza da Carga': str,
+                      'Sentido': str,
+                      'TEU': int,
+                      'QTCarga': int,
+                      'VLPesoCargaBruta': str})
+                      
+                      
+                      
+                                  dtype={'IDCarga': int,
+                                         'CDMercadoriaConteinerizada': str,
+                                         'VLPesoCargaConteinerizada': float}
+    '''

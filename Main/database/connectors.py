@@ -60,7 +60,7 @@ def find_load_exact(loadid, connection):
 
     c = connection.cursor()
     loadid = ", ".join(map(str, loadid))
-    query = f"SELECT * FROM loadstats WHERE IDCarga IN ({loadid})"
+    query = f"SELECT * FROM loadsinfo WHERE IDAtracacao IN ({loadid})"
     c.execute(query)
 
     result = c.fetchall()
@@ -73,7 +73,7 @@ def find_load_exact(loadid, connection):
     return {'Status': 'ok', 'Message': result}
 
 
-print(find_load_exact([8049372, 23338048], connection=sqlite3.connect('./Main/database/data/atr_info.db')))
+print(find_load_exact([900859, 941672], connection=sqlite3.connect('./Main/database/data/atr_info.db')))
 
 
 def find_imo_blank(connection):

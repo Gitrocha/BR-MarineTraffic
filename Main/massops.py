@@ -19,16 +19,57 @@ def print_exception():
     message = 'EXCEPTION IN ({}, LINE {} "{}"): {}'.format(filename, lineno, line.strip(), exc_obj)
     return message
 
+def loads_query(list):
+    conn = sqlite3.connect('./Main/database/data/atr_info.db')
+    result = connectors.find_load_exact(loadid=list, connection=conn)
+
+
+    df_trips = pd.DataFrame(result['Message'], columns=["IDCarga",
+                                                        "IDAtracacao",
+                                                        "Origem",
+                                                        "Destino",
+                                                        "CDMercadoria",
+                                                        "Tipo Operação da Carga",
+                                                        "Carga Geral Acondicionamento",
+                                                        "ConteinerEstado",
+                                                        "Tipo Navegação",
+                                                        "FlagAutorizacao",
+                                                        "FlagCabotagem",
+                                                        "FlagCabotagemMovimentacao",
+                                                        "FlagConteinerTamanho",
+                                                        "FlagLongoCurso",
+                                                        "FlagMCOperacaoCarga",
+                                                        "FlagOffshore",
+                                                        "FlagTransporteViaInterioir",
+                                                        "Percurso Transporte em vias Interiores",
+                                                        "Percurso Transporte Interiores",
+                                                        "STNaturezaCarga",
+                                                        "STSH2",
+                                                        "STSH4",
+                                                        "Natureza da Carga",
+                                                        "Sentido",
+                                                        "TEU",
+                                                        "QTCarga",
+                                                        "VLPesoCargaBruta",
+                                                        "CDMercadoriaConteinerizada",
+                                                        "VLPesoCargaCont"])
+
+    #print('Result', result['Message'])
+    #df_trips=pd.DataFrame()
+    return df_trips
+
+
 
 def imo_query():
-
-    conn = sqlite3.connect('./Main/database/data/atr_info.db')
 
     try:
         nimo = int(input('\n Insira o Número IMO para gerar relatório (Ou zero para outras consultas): '))
     except:
         print('\n Entrada inválida, digite o número IMO apenas.')
         return 's'
+
+    conn = sqlite3.connect('./Main/database/data/atr_info.db')
+    basepath = Path('.') / 'Reports' / f'IMO-{nimo}'
 
     x = t.time()
     if nimo == 0:
@@ -44,8 +85,8 @@ def imo_query():
         return rerun
 
     else:
-        print('\n Consulta concluída...')
-        df_teste = pd.DataFrame(result['Message'], columns=["IDAtracacao",
+        print('\n Consulta de navio concluída. Iniciando consulta por cargas...')
+        df_trips = pd.DataFrame(result['Message'], columns=["IDAtracacao",
                                                             "TEsperaAtracacao",
                                                             "TEsperaInicioOp",
                                                             "TOperacao",
@@ -78,9 +119,21 @@ def imo_query():
                                                             "Nº da Capitania",
                                                             "Nº do IMO"])
 
-        basepath = Path('.') / 'Reports' / f'IMO-{nimo}'
+        print('head', df_trips.head())
+        print('col', df_trips['IDAtracacao'].head())
 
-        print('\n Salvando dados...')
+        df_aux = df_trips['IDAtracacao'].copy(deep=True)
+        print('aux1', df_aux.head())
+
+        df = df_aux.drop_duplicates(keep='first')
+        print('aux2', df.head())
+
+        idatr_list = df.values.tolist()
+        print('list', idatr_list)
+        #idatr_list = [8049372, 23338048]
+
+        df_loads = loads_query(list=idatr_list)
+        print(df_loads.head())
 
         try:
             mkdir(basepath)
@@ -90,8 +143,10 @@ def imo_query():
             print('Pasta Já existe')
             return 's'
 
-        df_teste.to_csv(basepath / 'viagens' / f'{nimo}.csv', sep=';', encoding='cp1252', index=False)
+        print('\n Salvando dados...')
 
+        df_trips.to_csv(basepath / 'viagens' / f'Viagens-{nimo}.csv', sep=';', encoding='cp1252', index=False)
+        df_loads.to_csv(basepath / 'cargas' / f'Cargas-{nimo}.csv', sep=';', encoding='cp1252', index=False)
         print('\n Finalizado. Tempo total de consulta = ', round((y-x), 2), 'segundos')
 
         rerun = input('\n Deseja consultar novamente? (S ou N):  ').lower()
