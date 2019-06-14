@@ -73,7 +73,47 @@ def find_load_exact(loadid, connection):
     return {'Status': 'ok', 'Message': result}
 
 
-print(find_load_exact([900859, 941672], connection=sqlite3.connect('./Main/database/data/atr_info.db')))
+def find_port_atr(atrid, connection):
+
+    c = connection.cursor()
+    loadid = ", ".join(map(str, loadid))
+    query = f"SELECT * FROM loadsinfo WHERE IDAtracacao IN ({loadid})"
+    c.execute(query)
+
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'Load ID {loadid} not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+
+def find_port_loads(portid, connection):
+
+    c = connection.cursor()
+
+    '''
+    "SELECT * FROM atrstats WHERE IDAtracacao=:AtrID", {'AtrID': atrid}
+    Destino=:PortID
+    '''
+    query = f"SELECT * FROM loadsinfo WHERE Origem=:PortID " \
+        f"UNION " \
+        f"SELECT * FROM loadsinfo WHERE dESTINO=:PortID"
+
+    c.execute(query, {'PortID': portid})
+
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'Load ID {portid} not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+#print(find_load_exact([900859, 941672], connection=sqlite3.connect('./Main/database/data/atr_info.db')))
 
 
 def find_imo_blank(connection):
