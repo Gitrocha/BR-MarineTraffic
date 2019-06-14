@@ -1,6 +1,7 @@
 '''
 Module functions to properly interact with Database
 '''
+import sqlite3
 
 
 def add_data(atr, connection):
@@ -49,6 +50,100 @@ def find_imo_exact(imo, connection):
 
     if len(result) == 0:
         message = f'Ship {imo} not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+
+def find_load_exact(loadid, connection):
+
+    c = connection.cursor()
+    loadid = ", ".join(map(str, loadid))
+    query = f"SELECT * FROM loadsinfo WHERE IDAtracacao IN ({loadid})"
+    c.execute(query)
+
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'Load ID {loadid} not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+
+def find_port_atr(atrid, connection):
+
+    c = connection.cursor()
+    loadid = ", ".join(map(str, loadid))
+    query = f"SELECT * FROM loadsinfo WHERE IDAtracacao IN ({loadid})"
+    c.execute(query)
+
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'Load ID {loadid} not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+
+def find_port_loads(portid, connection):
+
+    c = connection.cursor()
+
+    '''
+    "SELECT * FROM atrstats WHERE IDAtracacao=:AtrID", {'AtrID': atrid}
+    Destino=:PortID
+    '''
+    query = f"SELECT * FROM loadsinfo WHERE Origem=:PortID " \
+        f"UNION " \
+        f"SELECT * FROM loadsinfo WHERE dESTINO=:PortID"
+
+    c.execute(query, {'PortID': portid})
+
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'Load ID {portid} not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+#print(find_load_exact([900859, 941672], connection=sqlite3.connect('./Main/database/data/atr_info.db')))
+
+
+def find_imo_blank(connection):
+
+    c = connection.cursor()
+    c.execute("SELECT * FROM atrstats WHERE [Nº do IMO] IS NULL "
+              "OR [Nº do IMO] = 0 "
+              "OR [Nº do IMO] = ' ' "
+              "OR TRIM([Nº do IMO]) = ''")
+
+    #c.execute("SELECT * FROM atrstats")
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'ShipS not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+
+def count(connection):
+
+    c = connection.cursor()
+    #c.execute("SELECT * FROM atrstats WHERE [Nº do IMO] IS NULL OR [Nº do IMO] = 0 OR [Nº do IMO] = ' ' ")
+    c.execute("SELECT COUNT(*) FROM atrstats")
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'ShipS not found'
         result = {'Status': 'ok', 'Message': message}
         return result
 
@@ -145,3 +240,4 @@ def remove_employee(employeeid, connection):
         message = f'There is no occurrence of id {employeeid}'
 
         return {'Status': 'error', 'Message': message}
+

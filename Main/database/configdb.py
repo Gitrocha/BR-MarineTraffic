@@ -13,8 +13,8 @@ def start_database():
     c = conn.cursor()
 
     try:
-        c.execute("""CREATE TABLE atr_stats (
-                IDAtracacao integer primary key,
+        c.execute("""CREATE TABLE atrstats (
+                IDAtracacao integer,
                 TEsperaAtracacao numeric,
                 TEsperaInicioOp numeric,
                 TOperacao numeric,
