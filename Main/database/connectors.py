@@ -56,6 +56,32 @@ def find_imo_exact(imo, connection):
     return {'Status': 'ok', 'Message': result}
 
 
+def find_imolist_exact(imolist, connection):
+
+
+    '''
+    loadid = ", ".join(map(str, loadid))
+    query = f"SELECT * FROM loadsinfo WHERE IDAtracacao IN ({loadid})"
+    :param imolist:
+    :param connection:
+    :return:
+    '''
+
+    #imolist = ", ".join(map(str, imolist))
+    c = connection.cursor()
+    c.execute(f"SELECT * FROM atrstats WHERE [Nº do IMO] IN ({imolist})")
+
+    result = c.fetchall()
+
+    if len(result) == 0:
+        message = f'Ship not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+
+
 def find_load_exact(loadid, connection):
 
     c = connection.cursor()
