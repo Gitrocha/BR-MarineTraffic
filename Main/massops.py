@@ -21,10 +21,9 @@ def print_exception():
 
 
 def loads_query(list):
+
     conn = sqlite3.connect('./Main/database/data/atr_info.db')
     result = connectors.find_load_exact(loadid=list, connection=conn)
-
-
     df_trips = pd.DataFrame(result['Message'], columns=["IDCarga",
                                                         "IDAtracacao",
                                                         "Origem",
@@ -55,8 +54,6 @@ def loads_query(list):
                                                         "CDMercadoriaConteinerizada",
                                                         "VLPesoCargaCont"])
 
-    #print('Result', result['Message'])
-    #df_trips=pd.DataFrame()
     return df_trips
 
 
@@ -68,24 +65,34 @@ def imo_query():
         print('\n Entrada inválida, digite o número IMO apenas.')
         return 's'
 
-    conn = sqlite3.connect('./Main/database/data/atr_info.db')
-    basepath = Path('.') / 'Reports' / f'IMO-{nimo}'
+    print('\n Salvando dados...')
 
     x = t.time()
+    conn = sqlite3.connect('./Main/database/data/atr_info.db')
     if nimo == 0:
         result = connectors.find_imo_blank(connection=conn)
     else:
         result = connectors.find_imo_exact(imo=nimo, connection=conn)
-    y = t.time()
     conn.close()
+    y = t.time()
 
     if isinstance(result['Message'], str):
-        print(result['Message'])
+        print('Result Message: \n', result['Message'])
         rerun = input('Deseja consultar novamente? (S ou N): ').lower()
         return rerun
 
     else:
-        print('\n Consulta de navio concluída. Iniciando consulta por cargas...')
+
+        try:
+            basepath = Path('.') / 'Reports' / f'IMO-{nimo}'
+            print('Organizando diretórios.')
+            mkdir(basepath)
+            mkdir(basepath / 'viagens')
+            mkdir(basepath / 'cargas')
+        except:
+            print('Pasta Já existe')
+            return 's'
+
         df_trips = pd.DataFrame(result['Message'], columns=["IDAtracacao",
                                                             "TEsperaAtracacao",
                                                             "TEsperaInicioOp",
@@ -119,8 +126,75 @@ def imo_query():
                                                             "Nº da Capitania",
                                                             "Nº do IMO"])
 
-        print('head', df_trips.head())
-        print('col', df_trips['IDAtracacao'].head())
+        # ----------- Create report metrics ---------------------------------
+        df_trips = df_trips[["IDAtracacao",
+                             "TEsperaAtracacao",
+                             "TEsperaInicioOp",
+                             "TOperacao",
+                             "TEsperaDesatracacao",
+                             "TAtracado",
+                             "TEstadia",
+                             "Porto Atracação",
+                             "Data Atracação",
+                             "Data Chegada",
+                             "Data Desatracação",
+                             "Data Início Operação",
+                             "Data Término Operação",
+                             "Tipo de Operação",
+                             "Tipo de Navegação da Atracação",
+                             "SGUF",
+                             "Nº da Capitania",
+                             "Nº do IMO"]]
+
+        df_trips = df_trips.rename(columns={
+            'Porto Atracação': "Porto",
+            'Data Atracação': 'Atracado',
+            'Data Chegada': 'Chegada',
+            'Data Desatracação': 'Desatracado',
+            'Data Início Operação': 'InicioOp',
+            'Data Término Operação': 'FimOp',
+            'Tipo de Navegação da Atracação': 'TipoNav',
+            'SGUF': 'UF',
+            'Nº da Capitania': 'Capitania',
+            'Nº do IMO': 'IMO'})
+
+        df_trips = df_trips.astype({'IDAtracacao': str,
+                                    'TEsperaAtracacao': float,
+                                    'TEsperaInicioOp': float,
+                                    'TOperacao': float,
+                                    'TEsperaDesatracacao': float,
+                                    'TAtracado': float,
+                                    'TEstadia': float,
+                                    'Porto': str,
+                                    'Atracado': str,
+                                    'Chegada': str,
+                                    'Desatracado': str,
+                                    'InicioOp': str,
+                                    'FimOp': str,
+                                    'TipoNav': str,
+                                    'UF': str,
+                                    'Capitania': str,
+                                    'IMO': int})
+
+        prancha = 0
+        tope = 1
+        tatr = 2
+        tesp = 3
+        vmed = 4
+        load = 5
+
+        filename = basepath / 'resumo.txt'
+        with open(filename, 'w+') as reports:
+            reports.write(f'Prancha média: {prancha}\n')
+            reports.write(f'Tempo médio de operação: {tope}\n')
+            reports.write(f'Tempo médio de atracação: {tatr}\n')
+            reports.write(f'Tempo médio de espera: {tesp}\n')
+            reports.write(f'Velocidade média: {vmed}\n')
+            reports.write(f'Carga média transportada: {load}\n')
+
+        # ----------- Loads report generation -------------------------------
+
+        print('\n Consulta de navio concluída. Iniciando consulta por cargas...')
 
         df_aux = df_trips['IDAtracacao'].copy(deep=True)
         print('aux1', df_aux.head())
@@ -129,26 +203,231 @@ def imo_query():
         print('aux2', df.head())
 
         idatr_list = df.values.tolist()
-        #print('list', idatr_list)
-        #idatr_list = [8049372, 23338048]
 
         u = t.time()
         df_loads = loads_query(list=idatr_list)
         v = t.time()
         print(df_loads.head())
 
+        # -------------- Saving DFs to disk ------------------------
+
+        df_trips.to_csv(basepath / 'viagens' / f'Viagens-{nimo}.csv', sep=';', encoding='cp1252', index=False)
+        df_loads.to_csv(basepath / 'cargas' / f'Cargas-{nimo}.csv', sep=';', encoding='cp1252', index=False)
+        print('\n Finalizado. Tempo total de consulta IMO = ', round((y-x), 2), 'segundos')
+        print('\n Tempo total de consulta de viagens = ', round((v - u), 2), 'segundos')
+        rerun = input('\n Deseja consultar novamente? (S ou N):  ').lower()
+        return rerun
+
+
+def imolist_query():
+
+    try:
+        nimo = input('\n Insira os Números IMO, separados por vírgula, para gerar relatório (Ou zero para outras consultas): ')
+    except:
+        print('\n Entrada inválida, digite o número IMO apenas.')
+        return 's'
+
+    print('\n Salvando dados...')
+
+    x = t.time()
+    conn = sqlite3.connect('./Main/database/data/atr_info.db')
+    if nimo == 0:
+        result = connectors.find_imo_blank(connection=conn)
+    else:
+        result = connectors.find_imolist_exact(imolist=nimo, connection=conn)
+    conn.close()
+    y = t.time()
+
+    if isinstance(result['Message'], str):
+        print('Result Message: \n', result['Message'])
+        rerun = input('Deseja consultar novamente? (S ou N): ').lower()
+        return rerun
+
+    else:
+        df_trips = pd.DataFrame(result['Message'], columns=["IDAtracacao",
+                                                            "TEsperaAtracacao",
+                                                            "TEsperaInicioOp",
+                                                            "TOperacao",
+                                                            "TEsperaDesatracacao",
+                                                            "TAtracado",
+                                                            "TEstadia",
+                                                            "CDTUP",
+                                                            "IDBerco",
+                                                            "Berço",
+                                                            "Porto Atracação",
+                                                            "Apelido Instalação Portuária",
+                                                            "Complexo Portuário",
+                                                            "Tipo da Autoridade Portuária",
+                                                            "Data Atracação",
+                                                            "Data Chegada",
+                                                            "Data Desatracação",
+                                                            "Data Início Operação",
+                                                            "Data Término Operação",
+                                                            "Ano",
+                                                            "Mes",
+                                                            "Tipo de Operação",
+                                                            "Tipo de Navegação da Atracação",
+                                                            "Nacionalidade do Armador",
+                                                            "FlagMCOperacaoAtracacao",
+                                                            "Terminal",
+                                                            "Município",
+                                                            "UF",
+                                                            "SGUF",
+                                                            "Região Geográfica",
+                                                            "Nº da Capitania",
+                                                            "Nº do IMO"])
+
+        # ----------- Create report metrics ---------------------------------
+        df_trips = df_trips[["IDAtracacao",
+                             "TEsperaAtracacao",
+                             "TEsperaInicioOp",
+                             "TOperacao",
+                             "TEsperaDesatracacao",
+                             "TAtracado",
+                             "TEstadia",
+                             "Porto Atracação",
+                             "Data Atracação",
+                             "Data Chegada",
+                             "Data Desatracação",
+                             "Data Início Operação",
+                             "Data Término Operação",
+                             "Tipo de Operação",
+                             "Tipo de Navegação da Atracação",
+                             "SGUF",
+                             "Nº da Capitania",
+                             "Nº do IMO"]]
+
+        df_trips = df_trips.rename(columns={
+            'Porto Atracação': "Porto",
+            'Data Atracação': 'Atracado',
+            'Data Chegada': 'Chegada',
+            'Data Desatracação': 'Desatracado',
+            'Data Início Operação': 'InicioOp',
+            'Data Término Operação': 'FimOp',
+            'Tipo de Navegação da Atracação': 'TipoNav',
+            'SGUF': 'UF',
+            'Nº da Capitania': 'Capitania',
+            'Nº do IMO': 'IMO'})
+
+        df_trips = df_trips.astype({'IDAtracacao': int,
+                                    'TEsperaAtracacao': float,
+                                    'TEsperaInicioOp': float,
+                                    'TOperacao': float,
+                                    'TEsperaDesatracacao': float,
+                                    'TAtracado': float,
+                                    'TEstadia': float,
+                                    'Porto': str,
+                                    'Atracado': str,
+                                    'Chegada': str,
+                                    'Desatracado': str,
+                                    'InicioOp': str,
+                                    'FimOp': str,
+                                    'TipoNav': str,
+                                    'UF': str,
+                                    'Capitania': str,
+                                    'IMO': int})
+
+        tespatr = round(df_trips['TEsperaAtracacao'].mean(), 2)
+        tespop = round(df_trips['TEsperaInicioOp'].mean(), 2)
+        tope = round(df_trips['TOperacao'].mean(), 2)
+        tatr = round(df_trips['TAtracado'].mean(), 2)
+        tespdatr = round(df_trips['TEsperaDesatracacao'].mean(), 2)
+        testad = round(df_trips['TEstadia'].mean(), 2)
+
+        # ----------- Loads report generation -------------------------------
+
+        print('\n Consulta de navio concluída. Iniciando consulta por cargas...')
+        # Add later to generate loads tables
+        df_aux = df_trips['IDAtracacao'].copy(deep=True)
+        df = df_aux.drop_duplicates(keep='first')
+        idatr_list = df.values.tolist()
+
+        u = t.time()
+        df_loads = loads_query(list=idatr_list)
+        v = t.time()
+
+        df_loads = df_loads[['IDCarga',
+                             'IDAtracacao',
+                             'Origem',
+                             'Destino',
+                             'Tipo Operação da Carga',
+                             'Natureza da Carga',
+                             'Sentido',
+                             'TEU',
+                             'QTCarga',
+                             'VLPesoCargaBruta',
+                             'CDMercadoriaConteinerizada',
+                             'VLPesoCargaCont']]
+
+        df_loads = df_loads.astype({'IDCarga': str,
+                                    'IDAtracacao': int,
+                                    'Origem': str,
+                                    'Destino': str,
+                                    'Tipo Operação da Carga': str,
+                                    'Natureza da Carga': str,
+                                    'Sentido': str,
+                                    'TEU': int,
+                                    'QTCarga': int,
+                                    'VLPesoCargaBruta': float,
+                                    'CDMercadoriaConteinerizada': str,
+                                    'VLPesoCargaCont': str})
+
+        # -------------- Create merged DF -----------
+        df_loadsinfo = df_loads.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
+        print(df_loadsinfo)
+
+        #df_loadsinfo.astype()
+        result_merge = pd.merge(df_trips,
+                                df_loadsinfo,
+                                on='IDAtracacao',
+                                how='outer')
+
+        result_merge['Prancha'] = result_merge['VLPesoCargaBruta'] / result_merge['TOperacao']
+        # df_trips['MovCargaTot'] =
+
+        # -------------- Saving tables queries ------------------------
+
+        basepath = Path('.') / 'Reports' / f'IMO-{nimo}'
+        print('Organizando diretório de viagens.')
         try:
             mkdir(basepath)
             mkdir(basepath / 'viagens')
+            #df_trips.to_csv(basepath / 'viagens' / f'Viagens-{nimo}.csv', sep=';', encoding='cp1252', index=False)
+            result_merge.to_csv(basepath / 'viagens' / f'Resultado.csv', sep=';', encoding='cp1252', index=False)
+        except:
+            print('Pasta Já existe')
+            return 's'
+        print('Organizando diretório de cargas.')
+        try:
             mkdir(basepath / 'cargas')
+            df_loads.to_csv(basepath / 'cargas' / f'Cargas.csv', sep=';', encoding='cp1252', index=False)
         except:
             print('Pasta Já existe')
             return 's'
 
-        print('\n Salvando dados...')
+        # -------------- Saving reports to disk -----------
 
-        df_trips.to_csv(basepath / 'viagens' / f'Viagens-{nimo}.csv', sep=';', encoding='cp1252', index=False)
-        df_loads.to_csv(basepath / 'cargas' / f'Cargas-{nimo}.csv', sep=';', encoding='cp1252', index=False)
+        filename = basepath / 'resumo de viagens.txt'
+        with open(filename, 'w+') as reports:
+            reports.write('----------- RESUMO DAS VIAGENS DA FROTA ------- \n')
+            reports.write('\n')
+            reports.write('----------- TEMPOS MÉDIOS --------------------- \n')
+            reports.write(f'Tempo médio de espera de atracação: {tespatr} horas\n')
+            reports.write(f'Tempo médio de operação: {tope} horas\n')
+            reports.write(f'Tempo médio de atracação: {tatr} horas\n')
+            reports.write(f'Tempo médio de espera de inicio de operação: {tespop} horas\n')
+            reports.write(f'Tempo médio de espera de desatracaçao: {tespdatr} horas\n')
+            reports.write(f'Tempo médio de estadia: {testad} horas\n')
+            reports.write(f'\n')
+            reports.write('----------- MAIS ESTATÍSTICAS DA AMOSTRA ----------- \n')
+            reports.write(f'Tempo máximo de espera de atracação: {tespatr} horas\n')
+            reports.write(f'Tempo mínimo de operação: {tope} horas\n')
+            reports.write(f'Desvio padrão de atracação: {tatr} horas\n')
+            reports.write(f'Tempo médio de espera de inicio de operação: {tespop} horas\n')
+            reports.write(f'Tempo médio de espera de desatracaçao: {tespdatr} horas\n')
+            reports.write(f'Tempo médio de estadia: {testad} horas\n')
+
+
         print('\n Finalizado. Tempo total de consulta IMO = ', round((y-x), 2), 'segundos')
         print('\n Tempo total de consulta de viagens = ', round((v - u), 2), 'segundos')
         rerun = input('\n Deseja consultar novamente? (S ou N):  ').lower()
@@ -303,19 +582,42 @@ def imo_loop():
 
     retorno = 's'
     while retorno == 's':
-        try:
-            retorno = imo_query()
-        except:
-            errormsg = "Unexpected error:" + str(sys.exc_info()[0]) + ' / ' + str(sys.exc_info()[1]) + ' / ' + \
-                       str(sys.exc_info()[2])
-            print(errormsg)
-            print(print_exception())
-            retorno = 'n'
+        #try:
+        retorno = imo_query()
+        #except:
+        #    errormsg = "Unexpected error:" + str(sys.exc_info()[0]) + ' / ' + str(sys.exc_info()[1]) + ' / ' + \
+        #               str(sys.exc_info()[2])
+        #    print(errormsg)
+        #    print(print_exception())
+        #    retorno = 'n'
 
         if retorno == 's':
             print('\n Executando consultas novamente. (Aperte CTRL+C para sair.) \n')
         else:
-            print('\n Consultas Finalizadas.')
+            print('\n Consultas Finalizadas. Encerrando aplicação. \n')
+            print(' ...')
+
+    t.sleep(3)
+
+
+def imolist_loop():
+
+    retorno = 's'
+    while retorno == 's':
+        #try:
+        retorno = imolist_query()
+        #except:
+        #    errormsg = "Unexpected error:" + str(sys.exc_info()[0]) + ' / ' + str(sys.exc_info()[1]) + ' / ' + \
+        #               str(sys.exc_info()[2])
+        #    print(errormsg)
+        #    print(print_exception())
+        #    retorno = 'n'
+
+        if retorno == 's':
+            print('\n Executando consultas novamente. (Aperte CTRL+C para sair.) \n')
+        else:
+            print('\n Consultas Finalizadas. Encerrando aplicação. \n')
+            print(' ...')
 
     t.sleep(3)
 
@@ -335,8 +637,8 @@ def cap_loop():
         if retorno == 's':
             print('\n Executando consultas novamente. (Aperte CTRL+C para sair.) \n')
         else:
-            print('\n Consultas Finalizadas.')
-
+            print('\n Consultas Finalizadas. Encerrando aplicação. \n')
+            print(' ...')
     t.sleep(3)
 
 
@@ -356,8 +658,8 @@ def portload_loop():
         if retorno == 's':
             print('\n Executando consultas novamente. (Aperte CTRL+C para sair.) \n')
         else:
-            print('\n Consultas Finalizadas.')
-
+            print('\n Consultas Finalizadas. Encerrando aplicação. \n')
+            print(' ...')
     t.sleep(3)
 
 
@@ -377,8 +679,8 @@ def portships_loop():
         if retorno == 's':
             print('\n Executando consultas novamente. (Aperte CTRL+C para sair.) \n')
         else:
-            print('\n Consultas Finalizadas.')
-
+            print('\n Consultas Finalizadas. Encerrando aplicação. \n')
+            print(' ...')
     t.sleep(3)
 
 
@@ -386,18 +688,24 @@ switch_ship = 0
 switch_mode = 0
 switch_port = 0
 
-switch_mode = str(input("\n Deseja buscar portos ou navios? (digite 'portos' ou 'navios' para continuar): ")).lower()
+#switch_mode = str(input("\n Deseja buscar portos ou navios? (digite 'portos' ou 'navios' para continuar): ")).lower()
+
+# shortcut test code
+switch_mode = 'navios'
 
 if switch_mode == 'navios':
 
     while switch_ship == 0:
 
-        switch_ship = str(input('\n Insira o tipo de busca (IMO ou CAPITANIA): ')).lower()
-
+        # switch_ship = str(input('\n Insira o tipo de busca (IMO ou CAPITANIA): ')).lower()
+        # shortcut test mode
+        switch_ship = 'lista'
         if switch_ship == 'imo':
             imo_loop()
         elif switch_ship == 'capitania':
             cap_loop()
+        elif switch_ship == 'lista':
+            imolist_loop()
         elif switch_ship == 'sair':
             break
         else:
