@@ -6,8 +6,8 @@ import numpy as np
 from pathlib import Path
 import sys
 from os import mkdir
-import matplotlib.pyplot as plt
-from matplotlib.ticker import PercentFormatter
+from analysis import metrics
+
 
 # Consultas de info na DB
 def print_exception():
@@ -222,7 +222,7 @@ def imo_query():
         return rerun
 
 
-def imolist_query(nimo):
+def imolist_query(nimo, name):
 
 
     # System Inputs
@@ -344,12 +344,12 @@ def imolist_query(nimo):
                                     'Capitania': str,
                                     'IMO': int})
         # Collect report metrics
-        tespatr = round(df_trips['TEsperaAtracacao'].mean(), 2)
-        tespop = round(df_trips['TEsperaInicioOp'].mean(), 2)
-        tope = round(df_trips['TOperacao'].mean(), 2)
-        tatr = round(df_trips['TAtracado'].mean(), 2)
-        tespdatr = round(df_trips['TEsperaDesatracacao'].mean(), 2)
-        testad = round(df_trips['TEstadia'].mean(), 2)
+        # tespatr = round(df_trips['TEsperaAtracacao'].mean(), 2)
+        # tespop = round(df_trips['TEsperaInicioOp'].mean(), 2)
+        # tope = round(df_trips['TOperacao'].mean(), 2)
+        # tatr = round(df_trips['TAtracado'].mean(), 2)
+        # tespdatr = round(df_trips['TEsperaDesatracacao'].mean(), 2)
+        # testad = round(df_trips['TEstadia'].mean(), 2)
 
         # ----------- Loads report generation -------------------------------
         print('\n Consulta de navio concluída. Iniciando consulta por cargas...')
@@ -362,7 +362,7 @@ def imolist_query(nimo):
         u = t.time()
         df_loads = loads_query(list=idatr_list)
         v = t.time()
-        print('Query finished.')
+        print(' Query finished.')
         # Slice loads dataframe columns
         df_loads = df_loads[['IDCarga',
                              'IDAtracacao',
@@ -392,11 +392,11 @@ def imolist_query(nimo):
 
         # -------------- Create merged DF -----------
         df_loadsinfo = df_loads.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
-        print('Pivot Table - Sum of loads by trips: \n')
-        print(df_loadsinfo)
+        print(' Pivot Table - Sum of loads by trips: \n')
+        #print(df_loadsinfo)
 
         #df_loadsinfo.astype()
-        print('Creating final report.')
+        print(' Creating final report.')
         result_merge = pd.merge(df_trips,
                                 df_loadsinfo,
                                 on='IDAtracacao',
@@ -420,33 +420,36 @@ def imolist_query(nimo):
         result_filtered = result_filtered.astype({'Prancha': float})
 
         #max = result_filtered['Prancha'].max()
-        maxrange = int(3*result_filtered.Prancha.std(axis=0, skipna=True))
+        #maxrange = int(result_filtered.Prancha.std(axis=0, skipna=True))
+        #auxmean = int(result_filtered.Prancha.mean()/25)
+        #print(maxrange)
 
-        result_filtered['Prancha'].hist(bins=[x for x in range(0, maxrange, 100)], alpha=0.5, color='green')
+        #result_filtered['Prancha'].hist(bins=[x for x in range(0, maxrange, auxmean)], alpha=0.5, color='green')
         #plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
         #plt.show()
-        plt.savefig(Path('.') / 'teste.png')
-        basepath = Path('.') / 'Reports' / f'IMO-{nimo}'
+        basepath = Path('.') / 'Reports' / f'IMO-Fleet-{name}'
 
-        print('Organizando diretório de viagens.')
+        print(' Organizando diretório de viagens.')
         try:
             mkdir(basepath)
             mkdir(basepath / 'viagens')
+            #plt.savefig(basepath / f'Prancha-Hist-{name}.png')
             #df_trips.to_csv(basepath / 'viagens' / f'Viagens-{nimo}.csv', sep=';', encoding='cp1252', index=False)
             result_filtered.to_csv(basepath / 'viagens' / f'Resultado.csv', sep=';', encoding='cp1252', index=False)
         except:
             print('Pasta Já existe')
             return 'n'
-        print('Organizando diretório de cargas.')
+        print(' Organizando diretório de cargas.')
         try:
             mkdir(basepath / 'cargas')
-            #df_loads.to_csv(basepath / 'cargas' / f'Cargas.csv', sep=';', encoding='cp1252', index=False)
+            df_loads.to_csv(basepath / 'cargas' / f'Cargas.csv', sep=';', encoding='cp1252', index=False)
         except:
             print('Pasta Já existe')
             return 's'
 
         # -------------- Saving reports to disk -----------
 
+        '''
         print(' Creating report of traffic KPIs.')
         filename = basepath / 'resumo de viagens.txt'
         with open(filename, 'w+') as reports:
@@ -475,7 +478,7 @@ def imolist_query(nimo):
             reports.write(f'Tempo médio de espera de inicio de operação: {tespop} horas\n')
             reports.write(f'Tempo médio de espera de desatracaçao: {tespdatr} horas\n')
             reports.write(f'Tempo médio de estadia: {testad} horas\n')
-
+        '''
 
         #y = 3
         #x = 2
@@ -495,12 +498,18 @@ def imo_multilist_query():
             list_of_groups.append(line)
 
     print(list_of_groups)
-    # list_of_groups = ['9489895,9697002', '9697002']
 
+    list_of_groups = [list.replace('\n', '') for list in list_of_groups]
+
+    print(list_of_groups)
+
+    xid = 0
     for group in list_of_groups:
-        imolist_query(group)
+        imolist_query(nimo=group, name=xid)
+        xid += 1
 
     return True
+
 
 def cap_query():
 
@@ -777,7 +786,8 @@ def start_local(switch_mode):
             elif switch_ship == 'sair':
                 break
             elif switch_ship == 'arquivo':
-                imo_multilist_query()
+                #imo_multilist_query()
+                metrics.create_analysis()
             else:
                 print("\n Entrada inválida. Digite 'IMO' ou 'CAPITANIA' para iniciar ou 'SAIR' para fechar a tela.")
                 switch_ship = 0
