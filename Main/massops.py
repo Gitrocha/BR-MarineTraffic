@@ -2,9 +2,12 @@ from database import connectors
 import sqlite3
 import time as t
 import pandas as pd
+import numpy as np
 from pathlib import Path
 import sys
 from os import mkdir
+from analysis import metrics
+
 
 # Consultas de info na DB
 def print_exception():
@@ -219,31 +222,45 @@ def imo_query():
         return rerun
 
 
-def imolist_query():
+def imolist_query(nimo, name):
 
-    try:
-        nimo = input('\n Insira os Números IMO, separados por vírgula, para gerar relatório (Ou zero para outras consultas): ')
-    except:
-        print('\n Entrada inválida, digite o número IMO apenas.')
-        return 's'
+
+    # System Inputs
+
+    #try:
+    #    nimo = input('\n Insira os Números IMO, separados por vírgula, para gerar relatório (Ou zero para outras consultas): ')
+    #except:
+    #    print('\n Entrada inválida, digite o número IMO apenas.')
+    #    return 's'
 
     print('\n Salvando dados...')
 
+    # System Query
+
     x = t.time()
     conn = sqlite3.connect('./Main/database/data/atr_info.db')
+
     if nimo == 0:
         result = connectors.find_imo_blank(connection=conn)
     else:
+        print(nimo)
         result = connectors.find_imolist_exact(imolist=nimo, connection=conn)
+        #{'Status': 'ok', 'Message': result}
+
     conn.close()
     y = t.time()
 
+    # System Reports
+
     if isinstance(result['Message'], str):
+        # {'Status': 'ok', 'Message': 'Ship not found'}
         print('Result Message: \n', result['Message'])
         rerun = input('Deseja consultar novamente? (S ou N): ').lower()
         return rerun
 
     else:
+        # {'Status': 'ok', 'Message': [List of ships]}
+        # Load json in Pandas DF
         df_trips = pd.DataFrame(result['Message'], columns=["IDAtracacao",
                                                             "TEsperaAtracacao",
                                                             "TEsperaInicioOp",
@@ -278,6 +295,7 @@ def imolist_query():
                                                             "Nº do IMO"])
 
         # ----------- Create report metrics ---------------------------------
+        # Slice dataframe columns
         df_trips = df_trips[["IDAtracacao",
                              "TEsperaAtracacao",
                              "TEsperaInicioOp",
@@ -296,7 +314,6 @@ def imolist_query():
                              "SGUF",
                              "Nº da Capitania",
                              "Nº do IMO"]]
-
         df_trips = df_trips.rename(columns={
             'Porto Atracação': "Porto",
             'Data Atracação': 'Atracado',
@@ -308,7 +325,7 @@ def imolist_query():
             'SGUF': 'UF',
             'Nº da Capitania': 'Capitania',
             'Nº do IMO': 'IMO'})
-
+        # Set datatypes of df columns
         df_trips = df_trips.astype({'IDAtracacao': int,
                                     'TEsperaAtracacao': float,
                                     'TEsperaInicioOp': float,
@@ -326,26 +343,27 @@ def imolist_query():
                                     'UF': str,
                                     'Capitania': str,
                                     'IMO': int})
-
-        tespatr = round(df_trips['TEsperaAtracacao'].mean(), 2)
-        tespop = round(df_trips['TEsperaInicioOp'].mean(), 2)
-        tope = round(df_trips['TOperacao'].mean(), 2)
-        tatr = round(df_trips['TAtracado'].mean(), 2)
-        tespdatr = round(df_trips['TEsperaDesatracacao'].mean(), 2)
-        testad = round(df_trips['TEstadia'].mean(), 2)
+        # Collect report metrics
+        # tespatr = round(df_trips['TEsperaAtracacao'].mean(), 2)
+        # tespop = round(df_trips['TEsperaInicioOp'].mean(), 2)
+        # tope = round(df_trips['TOperacao'].mean(), 2)
+        # tatr = round(df_trips['TAtracado'].mean(), 2)
+        # tespdatr = round(df_trips['TEsperaDesatracacao'].mean(), 2)
+        # testad = round(df_trips['TEstadia'].mean(), 2)
 
         # ----------- Loads report generation -------------------------------
-
         print('\n Consulta de navio concluída. Iniciando consulta por cargas...')
-        # Add later to generate loads tables
+        # Add later - generate loads tables
         df_aux = df_trips['IDAtracacao'].copy(deep=True)
         df = df_aux.drop_duplicates(keep='first')
         idatr_list = df.values.tolist()
-
+        # Run query of loads from shiplist history
+        print(' List of trips generated. Searching trips in database.')
         u = t.time()
         df_loads = loads_query(list=idatr_list)
         v = t.time()
-
+        print(' Query finished.')
+        # Slice loads dataframe columns
         df_loads = df_loads[['IDCarga',
                              'IDAtracacao',
                              'Origem',
@@ -358,7 +376,7 @@ def imolist_query():
                              'VLPesoCargaBruta',
                              'CDMercadoriaConteinerizada',
                              'VLPesoCargaCont']]
-
+        # Set loads df datatypes
         df_loads = df_loads.astype({'IDCarga': str,
                                     'IDAtracacao': int,
                                     'Origem': str,
@@ -374,30 +392,54 @@ def imolist_query():
 
         # -------------- Create merged DF -----------
         df_loadsinfo = df_loads.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
-        print(df_loadsinfo)
+        print(' Pivot Table - Sum of loads by trips: \n')
+        #print(df_loadsinfo)
 
         #df_loadsinfo.astype()
+        print(' Creating final report.')
         result_merge = pd.merge(df_trips,
                                 df_loadsinfo,
                                 on='IDAtracacao',
                                 how='outer')
 
         result_merge['Prancha'] = result_merge['VLPesoCargaBruta'] / result_merge['TOperacao']
+
+        # print(result_merge[result_merge['Prancha'] == 'inf'])
+
+        #result_merge = pd.read_csv(Path('.') / f'Teste.csv', sep=';', encoding='cp1252')
+
+        result_filtered = result_merge[~result_merge.isin([np.nan, np.inf, -np.inf]).any(1)]
+        # print('Result merge before \n', result_filtered[:5])
+
         # df_trips['MovCargaTot'] =
 
         # -------------- Saving tables queries ------------------------
 
-        basepath = Path('.') / 'Reports' / f'IMO-{nimo}'
-        print('Organizando diretório de viagens.')
+        # Print graphics
+
+        result_filtered = result_filtered.astype({'Prancha': float})
+
+        #max = result_filtered['Prancha'].max()
+        #maxrange = int(result_filtered.Prancha.std(axis=0, skipna=True))
+        #auxmean = int(result_filtered.Prancha.mean()/25)
+        #print(maxrange)
+
+        #result_filtered['Prancha'].hist(bins=[x for x in range(0, maxrange, auxmean)], alpha=0.5, color='green')
+        #plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+        #plt.show()
+        basepath = Path('.') / 'Reports' / f'IMO-Fleet-{name}'
+
+        print(' Organizando diretório de viagens.')
         try:
             mkdir(basepath)
             mkdir(basepath / 'viagens')
+            #plt.savefig(basepath / f'Prancha-Hist-{name}.png')
             #df_trips.to_csv(basepath / 'viagens' / f'Viagens-{nimo}.csv', sep=';', encoding='cp1252', index=False)
-            result_merge.to_csv(basepath / 'viagens' / f'Resultado.csv', sep=';', encoding='cp1252', index=False)
+            result_filtered.to_csv(basepath / 'viagens' / f'Resultado.csv', sep=';', encoding='cp1252', index=False)
         except:
             print('Pasta Já existe')
-            return 's'
-        print('Organizando diretório de cargas.')
+            return 'n'
+        print(' Organizando diretório de cargas.')
         try:
             mkdir(basepath / 'cargas')
             df_loads.to_csv(basepath / 'cargas' / f'Cargas.csv', sep=';', encoding='cp1252', index=False)
@@ -407,8 +449,18 @@ def imolist_query():
 
         # -------------- Saving reports to disk -----------
 
+        '''
+        print(' Creating report of traffic KPIs.')
         filename = basepath / 'resumo de viagens.txt'
         with open(filename, 'w+') as reports:
+
+            #tespatr = 0
+            #tespop = 0
+            #tope = 0
+            #tatr = 0
+            #tespdatr = 0
+            #testad = 0
+
             reports.write('----------- RESUMO DAS VIAGENS DA FROTA ------- \n')
             reports.write('\n')
             reports.write('----------- TEMPOS MÉDIOS --------------------- \n')
@@ -426,12 +478,37 @@ def imolist_query():
             reports.write(f'Tempo médio de espera de inicio de operação: {tespop} horas\n')
             reports.write(f'Tempo médio de espera de desatracaçao: {tespdatr} horas\n')
             reports.write(f'Tempo médio de estadia: {testad} horas\n')
+        '''
 
-
+        #y = 3
+        #x = 2
+        #v = 6
+        #u = 4
         print('\n Finalizado. Tempo total de consulta IMO = ', round((y-x), 2), 'segundos')
         print('\n Tempo total de consulta de viagens = ', round((v - u), 2), 'segundos')
-        rerun = input('\n Deseja consultar novamente? (S ou N):  ').lower()
-        return rerun
+        # rerun = input('\n Deseja consultar novamente? (S ou N):  ').lower()
+        #return rerun
+
+
+def imo_multilist_query():
+
+    with open(Path('Inputs') / 'fleets.txt', 'r') as inputfile:
+        list_of_groups = []
+        for line in inputfile:
+            list_of_groups.append(line)
+
+    print(list_of_groups)
+
+    list_of_groups = [list.replace('\n', '') for list in list_of_groups]
+
+    print(list_of_groups)
+
+    xid = 0
+    for group in list_of_groups:
+        imolist_query(nimo=group, name=xid)
+        xid += 1
+
+    return True
 
 
 def cap_query():
@@ -684,46 +761,53 @@ def portships_loop():
     t.sleep(3)
 
 
-switch_ship = 0
-switch_mode = 0
-switch_port = 0
+# Web components
+def start_local(switch_mode):
 
-#switch_mode = str(input("\n Deseja buscar portos ou navios? (digite 'portos' ou 'navios' para continuar): ")).lower()
+    #switch_mode = str(input("\n Deseja buscar portos ou navios? (digite 'portos' ou 'navios' para continuar): ")).lower()
 
-# shortcut test code
-switch_mode = 'navios'
+    # shortcut test code
+    #switch_mode = 'navios'
 
-if switch_mode == 'navios':
+    if switch_mode == 'navios':
 
-    while switch_ship == 0:
+        switch_ship = 0
+        while switch_ship == 0:
 
-        # switch_ship = str(input('\n Insira o tipo de busca (IMO ou CAPITANIA): ')).lower()
-        # shortcut test mode
-        switch_ship = 'lista'
-        if switch_ship == 'imo':
-            imo_loop()
-        elif switch_ship == 'capitania':
-            cap_loop()
-        elif switch_ship == 'lista':
-            imolist_loop()
-        elif switch_ship == 'sair':
-            break
-        else:
-            print("\n Entrada inválida. Digite 'IMO' ou 'CAPITANIA' para iniciar ou 'SAIR' para fechar a tela.")
-            switch_ship = 0
+            #switch_ship = str(input('\n Insira o tipo de busca (IMO, LISTA ou CAPITANIA): ')).lower()
+            # shortcut test mode
+            switch_ship = 'arquivo'
+            if switch_ship == 'imo':
+                imo_loop()
+            elif switch_ship == 'capitania':
+                cap_loop()
+            elif switch_ship == 'lista':
+                imolist_loop()
+            elif switch_ship == 'sair':
+                break
+            elif switch_ship == 'arquivo':
+                #imo_multilist_query()
+                metrics.create_analysis()
+            else:
+                print("\n Entrada inválida. Digite 'IMO' ou 'CAPITANIA' para iniciar ou 'SAIR' para fechar a tela.")
+                switch_ship = 0
 
-elif switch_mode == 'portos':
+    elif switch_mode == 'portos':
 
-    while switch_port == 0:
+        switch_port = 0
+        while switch_port == 0:
 
-        switch_port = str(input("\n Insira o tipo de busca (Digite 'cargas' ou 'navios'): ")).lower()
+            switch_port = str(input("\n Insira o tipo de busca (Digite 'cargas' ou 'navios'): ")).lower()
 
-        if switch_port == 'cargas':
-            portload_loop()
-        elif switch_port == 'navios':
-            portships_loop()
-        elif switch_port == 'sair':
-            break
-        else:
-            print("\n Entrada inválida. Digite 'Cargas' ou 'Navios' para iniciar ou 'SAIR' para fechar a tela.")
-            switch_port = 0
+            if switch_port == 'cargas':
+                portload_loop()
+            elif switch_port == 'navios':
+                portships_loop()
+            elif switch_port == 'sair':
+                break
+            else:
+                print("\n Entrada inválida. Digite 'Cargas' ou 'Navios' para iniciar ou 'SAIR' para fechar a tela.")
+                switch_port = 0
+
+
+start_local(switch_mode='navios')
