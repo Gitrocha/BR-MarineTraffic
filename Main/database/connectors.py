@@ -73,13 +73,13 @@ def find_imolist_exact(imolist, connection):
 
     result = c.fetchall()
 
+    # No ship found
     if len(result) == 0:
         message = f'Ship not found'
         result = {'Status': 'ok', 'Message': message}
         return result
 
     return {'Status': 'ok', 'Message': result}
-
 
 
 def find_load_exact(loadid, connection):
