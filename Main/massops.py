@@ -402,13 +402,13 @@ def imolist_query(nimo, name):
                                 on='IDAtracacao',
                                 how='outer')
 
-        result_merge['Prancha'] = result_merge['VLPesoCargaBruta'] / result_merge['TOperacao']
+        # result_merge['Prancha'] = result_merge['VLPesoCargaBruta'] / result_merge['TOperacao']
 
         # print(result_merge[result_merge['Prancha'] == 'inf'])
 
         #result_merge = pd.read_csv(Path('.') / f'Teste.csv', sep=';', encoding='cp1252')
 
-        result_filtered = result_merge[~result_merge.isin([np.nan, np.inf, -np.inf]).any(1)]
+        #result_filtered = result_merge[~result_merge.isin([np.nan, np.inf, -np.inf]).any(1)]
         # print('Result merge before \n', result_filtered[:5])
 
         # df_trips['MovCargaTot'] =
@@ -417,7 +417,7 @@ def imolist_query(nimo, name):
 
         # Print graphics
 
-        result_filtered = result_filtered.astype({'Prancha': float})
+        # result_filtered = result_filtered.astype({'Prancha': float})
 
         #max = result_filtered['Prancha'].max()
         #maxrange = int(result_filtered.Prancha.std(axis=0, skipna=True))
@@ -435,7 +435,7 @@ def imolist_query(nimo, name):
             mkdir(basepath / 'viagens')
             #plt.savefig(basepath / f'Prancha-Hist-{name}.png')
             #df_trips.to_csv(basepath / 'viagens' / f'Viagens-{nimo}.csv', sep=';', encoding='cp1252', index=False)
-            result_filtered.to_csv(basepath / 'viagens' / f'Resultado.csv', sep=';', encoding='cp1252', index=False)
+            result_merge.to_csv(basepath / 'viagens' / f'Resultado.csv', sep=';', encoding='cp1252', index=False)
         except:
             print('Pasta Já existe')
             return 'n'
@@ -494,18 +494,35 @@ def imo_multilist_query():
 
     with open(Path('Inputs') / 'fleets.txt', 'r') as inputfile:
         list_of_groups = []
+        group_names = []
         for line in inputfile:
-            list_of_groups.append(line)
+            #print('line:', line)
+            split = line.split(';', 1)
+            #print('split:', split)
 
-    print(list_of_groups)
+            header = split[0]
+            #print('header:', header)
+            group_names.append(header)
+            tail = split[1]
+            #print('tail:', tail)
+            list_of_groups.append(tail)
+
+    print('tails', list_of_groups)
+    print('headers', group_names)
 
     list_of_groups = [list.replace('\n', '') for list in list_of_groups]
 
-    print(list_of_groups)
+    print('tails clean', list_of_groups)
 
     xid = 0
-    for group in list_of_groups:
-        imolist_query(nimo=group, name=xid)
+    iters = len(group_names)
+    for group in range(iters):
+
+        imo = list_of_groups[xid]
+        print(imo)
+        name = group_names[xid]
+        print(name)
+        imolist_query(nimo=imo, name=name)
         xid += 1
 
     return True
@@ -774,20 +791,29 @@ def start_local(switch_mode):
         switch_ship = 0
         while switch_ship == 0:
 
-            #switch_ship = str(input('\n Insira o tipo de busca (IMO, LISTA ou CAPITANIA): ')).lower()
+            switch_ship = str(input('\n Insira o tipo de execução IMO, ARQUIVO ou ANALISE: ')).lower()
             # shortcut test mode
-            switch_ship = 'arquivo'
+            #switch_ship = 'analise'
+
             if switch_ship == 'imo':
                 imo_loop()
             elif switch_ship == 'capitania':
                 cap_loop()
+
             elif switch_ship == 'lista':
                 imolist_loop()
+
             elif switch_ship == 'sair':
                 break
+
             elif switch_ship == 'arquivo':
-                #imo_multilist_query()
+                imo_multilist_query()
+                switch_ship = 0
+
+            elif switch_ship == 'analise':
                 metrics.create_analysis()
+                switch_ship = True
+
             else:
                 print("\n Entrada inválida. Digite 'IMO' ou 'CAPITANIA' para iniciar ou 'SAIR' para fechar a tela.")
                 switch_ship = 0
