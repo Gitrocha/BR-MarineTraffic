@@ -94,6 +94,8 @@ venv/
 ENV/
 Codenv/
 
+frontend/
+
 # Spyder project settings
 .spyderproject
 .spyproject

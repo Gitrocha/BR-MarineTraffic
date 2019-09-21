@@ -56,6 +56,25 @@ def find_imo_exact(imo, connection):
     return {'Status': 'ok', 'Message': result}
 
 
+def find_trips_mmyyyy(month, year, connection):
+
+    c = connection.cursor()
+
+    datestring = f'___{month}/{year}'
+
+    c.execute(f"SELECT * FROM atrstats WHERE [Data Chegada] LIKE '{datestring}%' ORDER BY [Data Chegada]")
+
+    result = c.fetchall()
+
+    # No ship found
+    if len(result) == 0:
+        message = f'Ship not found'
+        result = {'Status': 'ok', 'Message': message}
+        return result
+
+    return {'Status': 'ok', 'Message': result}
+
+
 def find_imolist_exact(imolist, connection):
 
 
@@ -267,3 +286,6 @@ def remove_employee(employeeid, connection):
 
         return {'Status': 'error', 'Message': message}
 
+
+#conn = sqlite3.connect('./data/atr_info.db')
+#print(find_trips_mmyyyy(month='01', year='2010', connection=conn))

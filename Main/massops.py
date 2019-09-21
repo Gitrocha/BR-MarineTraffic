@@ -7,9 +7,10 @@ from pathlib import Path
 import sys
 from os import mkdir
 from analysis import metrics
+from functools import reduce
 
 
-# Consultas de info na DB
+# Single query in DB
 def print_exception():
     import linecache
     import sys
@@ -391,17 +392,49 @@ def imolist_query(nimo, name):
                                     'VLPesoCargaCont': str})
 
         # -------------- Create merged DF -----------
-        df_loadsinfo = df_loads.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
+        df_loadstotal = df_loads.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
+        df_loadstotal['VlPeso-Sentido'] = 'Agregado'
+        df_loadstotal.rename(columns={'VLPesoCargaBruta': 'VLPesoCargaBruta_Agg'}, inplace=True)
+        print('\n\n df_loadstotal: \n', df_loadstotal.head())
+
+        df_loads_in = df_loads[df_loads['Sentido'] == 'Embarcados']
+        df_loads_in_total = df_loads_in.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
+        df_loads_in_total['VlPeso-Sentido'] = 'Embarcados'
+        df_loads_in_total.rename(columns={'VLPesoCargaBruta': 'VLPesoCargaBruta_IN'}, inplace=True)
+        print('\n\n df_loadin: \n', df_loads_in_total.head())
+
+        df_loads_out = df_loads[df_loads['Sentido'] == 'Desembarcados']
+        df_loads_out_total = df_loads_out.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
+        df_loads_out_total['VlPeso-Sentido'] = 'Desembarcados'
+        df_loads_out_total.rename(columns={'VLPesoCargaBruta': 'VLPesoCargaBruta_OUT'}, inplace=True)
+
+        print('\n\n df_loadsout: \n', df_loads_out_total.head())
+        df_loads_nan = df_loads[~df_loads.Sentido.isin(['Desembarcados', 'Embarcados'])]
+        df_loads_nan_total = df_loads_nan.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
+        df_loads_nan_total['VlPeso-Sentido'] = 'NaN'
+        df_loads_nan_total.rename(columns={'VLPesoCargaBruta': 'VLPesoCargaBruta_NaN'}, inplace=True)
+        print('\n\n df_loadsnan: \n', df_loads_nan_total.head())
+
+        df_loads_balance = pd.concat([df_loads_nan_total,
+                                      df_loads_in_total,
+                                      df_loads_out_total,
+                                      df_loadstotal])
+
+        # TODO: merge left column for column to avoid duplicating atrid of each dock record
+        #df_loads_in = df_loads[df_loads['Sentido'] == 'Embarcados']
+        #df_loads_in.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
         print(' Pivot Table - Sum of loads by trips: \n')
         #print(df_loadsinfo)
 
         #df_loadsinfo.astype()
         print(' Creating final report.')
+        result_merge2 = pd.merge(df_trips, df_loads_balance, on='IDAtracacao', how='left')
         result_merge = pd.merge(df_trips,
-                                df_loadsinfo,
+                                df_loads_balance,
                                 on='IDAtracacao',
                                 how='outer')
 
+        '''
         # result_merge['Prancha'] = result_merge['VLPesoCargaBruta'] / result_merge['TOperacao']
 
         # print(result_merge[result_merge['Prancha'] == 'inf'])
@@ -427,6 +460,9 @@ def imolist_query(nimo, name):
         #result_filtered['Prancha'].hist(bins=[x for x in range(0, maxrange, auxmean)], alpha=0.5, color='green')
         #plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
         #plt.show()
+        
+        '''
+
         basepath = Path('.') / 'Reports' / f'IMO-Fleet-{name}'
 
         print(' Organizando diretório de viagens.')
@@ -436,6 +472,7 @@ def imolist_query(nimo, name):
             #plt.savefig(basepath / f'Prancha-Hist-{name}.png')
             #df_trips.to_csv(basepath / 'viagens' / f'Viagens-{nimo}.csv', sep=';', encoding='cp1252', index=False)
             result_merge.to_csv(basepath / 'viagens' / f'Resultado.csv', sep=';', encoding='cp1252', index=False)
+            result_merge2.to_csv(basepath / 'viagens' / f'Resultado_NEW.csv', sep=';', encoding='cp1252', index=False)
         except:
             print('Pasta Já existe')
             return 'n'
@@ -490,42 +527,213 @@ def imolist_query(nimo, name):
         #return rerun
 
 
-def imo_multilist_query():
+def research_query(month, year):
 
-    with open(Path('Inputs') / 'fleets.txt', 'r') as inputfile:
-        list_of_groups = []
-        group_names = []
-        for line in inputfile:
-            #print('line:', line)
-            split = line.split(';', 1)
-            #print('split:', split)
+    print('\n Salvando dados...')
 
-            header = split[0]
-            #print('header:', header)
-            group_names.append(header)
-            tail = split[1]
-            #print('tail:', tail)
-            list_of_groups.append(tail)
+    # System Query
 
-    print('tails', list_of_groups)
-    print('headers', group_names)
+    x = t.time()
+    conn = sqlite3.connect('./Main/database/data/atr_info.db')
+    print('Date searched', month, '/', year)
+    #result = connectors.find_trips_mmyyyy(month=month, year=month, connection=conn)
+    result = connectors.find_trips_mmyyyy(month='01', year='2010', connection=conn)
+    # {'Status': 'ok', 'Message': result}
 
-    list_of_groups = [list.replace('\n', '') for list in list_of_groups]
+    conn.close()
+    y = t.time()
 
-    print('tails clean', list_of_groups)
+    # System Reports
 
-    xid = 0
-    iters = len(group_names)
-    for group in range(iters):
+    if isinstance(result['Message'], str):
+        # {'Status': 'ok', 'Message': 'Ship not found'}
+        print('Result Message: \n', result['Message'])
+        rerun = input('Deseja consultar novamente? (S ou N): ').lower()
+        return rerun
 
-        imo = list_of_groups[xid]
-        print(imo)
-        name = group_names[xid]
-        print(name)
-        imolist_query(nimo=imo, name=name)
-        xid += 1
+    else:
+        # {'Status': 'ok', 'Message': [List of ships]}
+        # Load json in Pandas DF
+        df_trips = pd.DataFrame(result['Message'], columns=["IDAtracacao",
+                                                            "TEsperaAtracacao",
+                                                            "TEsperaInicioOp",
+                                                            "TOperacao",
+                                                            "TEsperaDesatracacao",
+                                                            "TAtracado",
+                                                            "TEstadia",
+                                                            "CDTUP",
+                                                            "IDBerco",
+                                                            "Berço",
+                                                            "Porto Atracação",
+                                                            "Apelido Instalação Portuária",
+                                                            "Complexo Portuário",
+                                                            "Tipo da Autoridade Portuária",
+                                                            "Data Atracação",
+                                                            "Data Chegada",
+                                                            "Data Desatracação",
+                                                            "Data Início Operação",
+                                                            "Data Término Operação",
+                                                            "Ano",
+                                                            "Mes",
+                                                            "Tipo de Operação",
+                                                            "Tipo de Navegação da Atracação",
+                                                            "Nacionalidade do Armador",
+                                                            "FlagMCOperacaoAtracacao",
+                                                            "Terminal",
+                                                            "Município",
+                                                            "UF",
+                                                            "SGUF",
+                                                            "Região Geográfica",
+                                                            "Nº da Capitania",
+                                                            "Nº do IMO"])
 
-    return True
+        # ----------- Create report metrics ---------------------------------
+        # Slice dataframe columns
+        df_trips = df_trips[["IDAtracacao",
+                             "TEsperaAtracacao",
+                             "TEsperaInicioOp",
+                             "TOperacao",
+                             "TEsperaDesatracacao",
+                             "TAtracado",
+                             "TEstadia",
+                             "Porto Atracação",
+                             "Data Atracação",
+                             "Data Chegada",
+                             "Data Desatracação",
+                             "Data Início Operação",
+                             "Data Término Operação",
+                             "Tipo de Operação",
+                             "Tipo de Navegação da Atracação",
+                             "SGUF",
+                             "Nº da Capitania",
+                             "Nº do IMO"]]
+        df_trips = df_trips.rename(columns={
+            'Porto Atracação': "Porto",
+            'Data Atracação': 'Atracado',
+            'Data Chegada': 'Chegada',
+            'Data Desatracação': 'Desatracado',
+            'Data Início Operação': 'InicioOp',
+            'Data Término Operação': 'FimOp',
+            'Tipo de Navegação da Atracação': 'TipoNav',
+            'SGUF': 'UF',
+            'Nº da Capitania': 'Capitania',
+            'Nº do IMO': 'IMO'})
+
+        df_trips.loc[(df_trips.IMO == ''), 'IMO'] = 0
+
+        # Set datatypes of df columns
+        df_trips = df_trips.astype({'IDAtracacao': int,
+                                    'TEsperaAtracacao': float,
+                                    'TEsperaInicioOp': float,
+                                    'TOperacao': float,
+                                    'TEsperaDesatracacao': float,
+                                    'TAtracado': float,
+                                    'TEstadia': float,
+                                    'Porto': str,
+                                    'Atracado': str,
+                                    'Chegada': str,
+                                    'Desatracado': str,
+                                    'InicioOp': str,
+                                    'FimOp': str,
+                                    'TipoNav': str,
+                                    'UF': str,
+                                    'Capitania': str,
+                                    'IMO': int})
+
+        # ----------- Loads report generation -------------------------------
+        print('\n Consulta de navio concluída. Iniciando consulta por cargas...')
+        # Add later - generate loads tables
+        df_aux = df_trips['IDAtracacao'].copy(deep=True)
+        df = df_aux.drop_duplicates(keep='first')
+        idatr_list = df.values.tolist()
+        # Run query of loads from shiplist history
+        print(' List of trips generated. Searching trips in database.')
+        u = t.time()
+        df_loads = loads_query(list=idatr_list)
+        v = t.time()
+        print(' Query finished.')
+        # Slice loads dataframe columns
+        df_loads = df_loads[['IDCarga',
+                             'IDAtracacao',
+                             'Origem',
+                             'Destino',
+                             'Tipo Operação da Carga',
+                             'Natureza da Carga',
+                             'Sentido',
+                             'TEU',
+                             'QTCarga',
+                             'VLPesoCargaBruta',
+                             'CDMercadoriaConteinerizada',
+                             'VLPesoCargaCont']]
+        # Set loads df datatypes
+        df_loads = df_loads.astype({'IDCarga': str,
+                                    'IDAtracacao': int,
+                                    'Origem': str,
+                                    'Destino': str,
+                                    'Tipo Operação da Carga': str,
+                                    'Natureza da Carga': str,
+                                    'Sentido': str,
+                                    'TEU': int,
+                                    'QTCarga': int,
+                                    'VLPesoCargaBruta': float,
+                                    'CDMercadoriaConteinerizada': str,
+                                    'VLPesoCargaCont': str})
+
+        # -------------- Create merged DF -----------
+        df_loads_slice = df_loads[['IDAtracacao', 'Sentido', 'VLPesoCargaBruta']]
+        df_loads_group = df_loads_slice.groupby(['Sentido'])
+        df_loads_in = df_loads_group.get_group('Embarcados')
+        df_loads_in = df_loads_in[['IDAtracacao', 'VLPesoCargaBruta']]
+        df_loads_in_agg = df_loads_in.groupby(['IDAtracacao']).agg({'VLPesoCargaBruta': ['sum']})
+        df_loads_in_agg = df_loads_in_agg.reset_index()
+        df_loads_in_agg.columns = ['IDAtracacao', 'VLPesoCargaBruta_IN']
+        print(df_loads_in_agg)
+
+        df_loads_group = df_loads_slice.groupby(['Sentido'])
+        df_loads_out = df_loads_group.get_group('Desembarcados')
+        df_loads_out = df_loads_out[['IDAtracacao', 'VLPesoCargaBruta']]
+        df_loads_out_agg = df_loads_out.groupby(['IDAtracacao']).agg({'VLPesoCargaBruta': ['sum']})
+        df_loads_out_agg = df_loads_out_agg.reset_index()
+        df_loads_out_agg.columns = ['IDAtracacao', 'VLPesoCargaBruta_OUT']
+        print(df_loads_out_agg)
+
+        # TODO: merge left column for column to avoid duplicating atrid of each dock record
+        # df_loads_in = df_loads[df_loads['Sentido'] == 'Embarcados']
+        # df_loads_in.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
+        print(' Pivot Table - Sum of loads by trips: \n')
+        # print(df_loadsinfo)
+
+        # df_loadsinfo.astype()
+        print(' Creating final report.')
+        df_list = [df_trips, df_loads_in_agg, df_loads_out_agg]
+
+        result_merge = reduce(lambda left, right: pd.merge(left, right, on='IDAtracacao', how='outer'), df_list)
+
+        basepath = Path('.') / 'Research' / f'{year}-{month}'
+
+        print(' Organizando diretório de viagens.')
+        try:
+            mkdir(basepath)
+            mkdir(basepath / 'viagens')
+            # plt.savefig(basepath / f'Prancha-Hist-{name}.png')
+            # df_trips.to_csv(basepath / 'viagens' / f'Viagens-{nimo}.csv', sep=';', encoding='cp1252', index=False)
+            result_merge.to_csv(basepath / 'viagens' / f'Resultado.csv', sep=';', encoding='cp1252', index=False)
+            #result_merge2.to_csv(basepath / 'viagens' / f'Resultado_NEW.csv', sep=';', encoding='cp1252', index=False)
+        except:
+            print('Pasta Já existe')
+            return 'n'
+        print(' Organizando diretório de cargas.')
+        try:
+            mkdir(basepath / 'cargas')
+            df_loads.to_csv(basepath / 'cargas' / f'Cargas.csv', sep=';', encoding='cp1252', index=False)
+        except:
+            print('Pasta Já existe')
+            return 's'
+
+        # -------------- Saving reports to disk -----------
+
+        print('\n Finalizado. Tempo total de consulta IMO = ', round((y - x), 2), 'segundos')
+        print('\n Tempo total de consulta de viagens = ', round((v - u), 2), 'segundos')
 
 
 def cap_query():
@@ -671,6 +879,61 @@ def ploads_query():
         return rerun
 
 
+# Multiple Queries iterators
+def imo_multilist_query():
+
+    with open(Path('Inputs') / 'fleets.txt', 'r') as inputfile:
+        list_of_groups = []
+        group_names = []
+        for line in inputfile:
+            #print('line:', line)
+            split = line.split(';', 1)
+            #print('split:', split)
+
+            header = split[0]
+            #print('header:', header)
+            group_names.append(header)
+            tail = split[1]
+            #print('tail:', tail)
+            list_of_groups.append(tail)
+
+    print('tails', list_of_groups)
+    print('headers', group_names)
+
+    list_of_groups = [list.replace('\n', '') for list in list_of_groups]
+
+    print('tails clean', list_of_groups)
+
+    xid = 0
+    iters = len(group_names)
+    for group in range(iters):
+
+        imo = list_of_groups[xid]
+        print(imo)
+        name = group_names[xid]
+        print(name)
+        imolist_query(nimo=imo, name=name)
+        xid += 1
+
+    return True
+
+
+def multi_research_query():
+
+    #list_years = [str(x) for x in range(2010, 2011, 1)]
+    list_years = ['2010']
+    #print(list_years)
+    #list_months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
+    list_months = ['01']
+
+    for year in list_years:
+        for m in list_months:
+            print('month', m, 'year', year)
+            research_query(month=m, year=year)
+
+    return True
+
+
 # Front Loops
 def imo_loop():
 
@@ -791,12 +1054,13 @@ def start_local(switch_mode):
         switch_ship = 0
         while switch_ship == 0:
 
-            switch_ship = str(input('\n Insira o tipo de execução IMO, ARQUIVO ou ANALISE: ')).lower()
+            #switch_ship = str(input('\n Insira o tipo de execução IMO, ARQUIVO, ESTUDO ou ANALISE: ')).lower()
             # shortcut test mode
-            #switch_ship = 'analise'
+            switch_ship = 'estudo'
 
             if switch_ship == 'imo':
                 imo_loop()
+
             elif switch_ship == 'capitania':
                 cap_loop()
 
@@ -809,6 +1073,10 @@ def start_local(switch_mode):
             elif switch_ship == 'arquivo':
                 imo_multilist_query()
                 switch_ship = 0
+
+            elif switch_ship == 'estudo':
+                multi_research_query()
+                switch_ship = 1
 
             elif switch_ship == 'analise':
                 metrics.create_analysis()
