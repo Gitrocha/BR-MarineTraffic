@@ -392,47 +392,28 @@ def imolist_query(nimo, name):
                                     'VLPesoCargaCont': str})
 
         # -------------- Create merged DF -----------
-        df_loadstotal = df_loads.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
-        df_loadstotal['VlPeso-Sentido'] = 'Agregado'
-        df_loadstotal.rename(columns={'VLPesoCargaBruta': 'VLPesoCargaBruta_Agg'}, inplace=True)
-        print('\n\n df_loadstotal: \n', df_loadstotal.head())
+        # TODO: Add more slices to improve analysis stats
+        df_loads_slice = df_loads[['IDAtracacao', 'Sentido', 'VLPesoCargaBruta']]
 
-        df_loads_in = df_loads[df_loads['Sentido'] == 'Embarcados']
-        df_loads_in_total = df_loads_in.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
-        df_loads_in_total['VlPeso-Sentido'] = 'Embarcados'
-        df_loads_in_total.rename(columns={'VLPesoCargaBruta': 'VLPesoCargaBruta_IN'}, inplace=True)
-        print('\n\n df_loadin: \n', df_loads_in_total.head())
+        df_loads_group = df_loads_slice.groupby(['Sentido'])
+        df_loads_in = df_loads_group.get_group('Embarcados')
+        df_loads_in = df_loads_in[['IDAtracacao', 'VLPesoCargaBruta']]
+        df_loads_in_agg = df_loads_in.groupby(['IDAtracacao']).agg({'VLPesoCargaBruta': ['sum']})
+        df_loads_in_agg = df_loads_in_agg.reset_index()
+        df_loads_in_agg.columns = ['IDAtracacao', 'VLPesoCargaBruta_IN']
+        # print(df_loads_in_agg)
 
-        df_loads_out = df_loads[df_loads['Sentido'] == 'Desembarcados']
-        df_loads_out_total = df_loads_out.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
-        df_loads_out_total['VlPeso-Sentido'] = 'Desembarcados'
-        df_loads_out_total.rename(columns={'VLPesoCargaBruta': 'VLPesoCargaBruta_OUT'}, inplace=True)
+        df_loads_group = df_loads_slice.groupby(['Sentido'])
+        df_loads_out = df_loads_group.get_group('Desembarcados')
+        df_loads_out = df_loads_out[['IDAtracacao', 'VLPesoCargaBruta']]
+        df_loads_out_agg = df_loads_out.groupby(['IDAtracacao']).agg({'VLPesoCargaBruta': ['sum']})
+        df_loads_out_agg = df_loads_out_agg.reset_index()
+        df_loads_out_agg.columns = ['IDAtracacao', 'VLPesoCargaBruta_OUT']
+        # print(df_loads_out_agg)
 
-        print('\n\n df_loadsout: \n', df_loads_out_total.head())
-        df_loads_nan = df_loads[~df_loads.Sentido.isin(['Desembarcados', 'Embarcados'])]
-        df_loads_nan_total = df_loads_nan.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
-        df_loads_nan_total['VlPeso-Sentido'] = 'NaN'
-        df_loads_nan_total.rename(columns={'VLPesoCargaBruta': 'VLPesoCargaBruta_NaN'}, inplace=True)
-        print('\n\n df_loadsnan: \n', df_loads_nan_total.head())
-
-        df_loads_balance = pd.concat([df_loads_nan_total,
-                                      df_loads_in_total,
-                                      df_loads_out_total,
-                                      df_loadstotal])
-
-        # TODO: merge left column for column to avoid duplicating atrid of each dock record
-        #df_loads_in = df_loads[df_loads['Sentido'] == 'Embarcados']
-        #df_loads_in.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
-        print(' Pivot Table - Sum of loads by trips: \n')
-        #print(df_loadsinfo)
-
-        #df_loadsinfo.astype()
         print(' Creating final report.')
-        result_merge2 = pd.merge(df_trips, df_loads_balance, on='IDAtracacao', how='left')
-        result_merge = pd.merge(df_trips,
-                                df_loads_balance,
-                                on='IDAtracacao',
-                                how='outer')
+        df_list = [df_trips, df_loads_in_agg, df_loads_out_agg]
+        result_merge = reduce(lambda left, right: pd.merge(left, right, on='IDAtracacao', how='outer'), df_list)
 
         '''
         # result_merge['Prancha'] = result_merge['VLPesoCargaBruta'] / result_merge['TOperacao']
@@ -463,7 +444,7 @@ def imolist_query(nimo, name):
         
         '''
 
-        basepath = Path('.') / 'Reports' / f'IMO-Fleet-{name}'
+        basepath = Path('.') / 'Reports' / 'Fleets' / f'Fleet-{name}'
 
         print(' Organizando diretório de viagens.')
         try:
@@ -472,7 +453,6 @@ def imolist_query(nimo, name):
             #plt.savefig(basepath / f'Prancha-Hist-{name}.png')
             #df_trips.to_csv(basepath / 'viagens' / f'Viagens-{nimo}.csv', sep=';', encoding='cp1252', index=False)
             result_merge.to_csv(basepath / 'viagens' / f'Resultado.csv', sep=';', encoding='cp1252', index=False)
-            result_merge2.to_csv(basepath / 'viagens' / f'Resultado_NEW.csv', sep=';', encoding='cp1252', index=False)
         except:
             print('Pasta Já existe')
             return 'n'
@@ -680,14 +660,16 @@ def research_query(month, year):
                                     'VLPesoCargaCont': str})
 
         # -------------- Create merged DF -----------
+        # TODO: Add more slices to improve analysis stats
         df_loads_slice = df_loads[['IDAtracacao', 'Sentido', 'VLPesoCargaBruta']]
+
         df_loads_group = df_loads_slice.groupby(['Sentido'])
         df_loads_in = df_loads_group.get_group('Embarcados')
         df_loads_in = df_loads_in[['IDAtracacao', 'VLPesoCargaBruta']]
         df_loads_in_agg = df_loads_in.groupby(['IDAtracacao']).agg({'VLPesoCargaBruta': ['sum']})
         df_loads_in_agg = df_loads_in_agg.reset_index()
         df_loads_in_agg.columns = ['IDAtracacao', 'VLPesoCargaBruta_IN']
-        print(df_loads_in_agg)
+        #print(df_loads_in_agg)
 
         df_loads_group = df_loads_slice.groupby(['Sentido'])
         df_loads_out = df_loads_group.get_group('Desembarcados')
@@ -695,23 +677,15 @@ def research_query(month, year):
         df_loads_out_agg = df_loads_out.groupby(['IDAtracacao']).agg({'VLPesoCargaBruta': ['sum']})
         df_loads_out_agg = df_loads_out_agg.reset_index()
         df_loads_out_agg.columns = ['IDAtracacao', 'VLPesoCargaBruta_OUT']
-        print(df_loads_out_agg)
+        #print(df_loads_out_agg)
 
-        # TODO: merge left column for column to avoid duplicating atrid of each dock record
-        # df_loads_in = df_loads[df_loads['Sentido'] == 'Embarcados']
-        # df_loads_in.pivot_table(['VLPesoCargaBruta'], ['IDAtracacao'], aggfunc='sum')
-        print(' Pivot Table - Sum of loads by trips: \n')
-        # print(df_loadsinfo)
-
-        # df_loadsinfo.astype()
         print(' Creating final report.')
         df_list = [df_trips, df_loads_in_agg, df_loads_out_agg]
-
         result_merge = reduce(lambda left, right: pd.merge(left, right, on='IDAtracacao', how='outer'), df_list)
 
-        basepath = Path('.') / 'Research' / f'{year}-{month}'
+        basepath = Path('.') / 'Reports' / 'Research' / f'{year}-{month}'
 
-        print(' Organizando diretório de viagens.')
+        print(' Organizando diretórios.')
         try:
             mkdir(basepath)
             mkdir(basepath / 'viagens')
@@ -935,55 +909,12 @@ def multi_research_query():
 
 
 # Front Loops
-def imo_loop():
+def user_loop(afunc):
 
-    retorno = 's'
-    while retorno == 's':
-        #try:
-        retorno = imo_query()
-        #except:
-        #    errormsg = "Unexpected error:" + str(sys.exc_info()[0]) + ' / ' + str(sys.exc_info()[1]) + ' / ' + \
-        #               str(sys.exc_info()[2])
-        #    print(errormsg)
-        #    print(print_exception())
-        #    retorno = 'n'
-
-        if retorno == 's':
-            print('\n Executando consultas novamente. (Aperte CTRL+C para sair.) \n')
-        else:
-            print('\n Consultas Finalizadas. Encerrando aplicação. \n')
-            print(' ...')
-
-    t.sleep(3)
-
-
-def imolist_loop():
-
-    retorno = 's'
-    while retorno == 's':
-        #try:
-        retorno = imolist_query()
-        #except:
-        #    errormsg = "Unexpected error:" + str(sys.exc_info()[0]) + ' / ' + str(sys.exc_info()[1]) + ' / ' + \
-        #               str(sys.exc_info()[2])
-        #    print(errormsg)
-        #    print(print_exception())
-        #    retorno = 'n'
-
-        if retorno == 's':
-            print('\n Executando consultas novamente. (Aperte CTRL+C para sair.) \n')
-        else:
-            print('\n Consultas Finalizadas. Encerrando aplicação. \n')
-            print(' ...')
-
-    t.sleep(3)
-
-
-def cap_loop():
     retorno = 's'
     while retorno == 's':
         try:
-            retorno = cap_query()
+            retorno = afunc
         except:
             errormsg = "Unexpected error:" + str(sys.exc_info()[0]) + ' / ' + str(sys.exc_info()[1]) + ' / ' + \
                        str(sys.exc_info()[2])
@@ -996,6 +927,7 @@ def cap_loop():
         else:
             print('\n Consultas Finalizadas. Encerrando aplicação. \n')
             print(' ...')
+
     t.sleep(3)
 
 
@@ -1054,24 +986,21 @@ def start_local(switch_mode):
         switch_ship = 0
         while switch_ship == 0:
 
-            #switch_ship = str(input('\n Insira o tipo de execução IMO, ARQUIVO, ESTUDO ou ANALISE: ')).lower()
+            switch_ship = str(input('\n Insira o tipo de execução IMO, ARQUIVO, ESTUDO ou ANALISE: ')).lower()
             # shortcut test mode
-            switch_ship = 'estudo'
+            #switch_ship = 'estudo'
 
             if switch_ship == 'imo':
-                imo_loop()
+                user_loop(imo_query())
 
             elif switch_ship == 'capitania':
-                cap_loop()
-
-            elif switch_ship == 'lista':
-                imolist_loop()
+                user_loop(cap_query())
 
             elif switch_ship == 'sair':
                 break
 
             elif switch_ship == 'arquivo':
-                imo_multilist_query()
+                user_loop(imo_multilist_query())
                 switch_ship = 0
 
             elif switch_ship == 'estudo':

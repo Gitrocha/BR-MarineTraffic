@@ -8,7 +8,8 @@ import numpy as np
 
 def create_analysis():
     basepath = Path('.')
-    report_path = basepath / 'Reports'
+    folder_type = str(input('Escolha a pasta para analisar: (Research ou Fleets)')).lower()
+    report_path = basepath / 'Reports' / folder_type
     folders_list = functions.find_folders(report_path)
     print(folders_list)
 
@@ -19,9 +20,10 @@ def create_analysis():
               f'----------------------------')
         trip_path = report_path / group / 'viagens'
 
-        trips_df = pd.read_csv(trip_path / 'Resultado.csv', sep=';', encoding = 'cp1252')
+        trips_df = pd.read_csv(trip_path / 'Resultado.csv', sep=';', encoding='cp1252')
         print('\n\ndescribe: \n', trips_df.describe())
 
+        trips_df['VLPesoCargaBruta'] = trips_df['VLPesoCargaBruta_IN'] + trips_df['VLPesoCargaBruta_OUT']
         trips_df['Prancha'] = trips_df['VLPesoCargaBruta'] / trips_df['TOperacao']
 
         trips_df = trips_df.astype({'Prancha': float})
@@ -49,5 +51,6 @@ def create_analysis():
         trips_df_merged = pd.concat([trips_df_nokc, trips_df_ok])
 
         print('\n\ndescribe merged: \n', trips_df_merged.describe())
-        trips_df_merged.to_csv(trip_path / 'Resultado-V2all.csv', index=False, sep=';')
+        trips_df_merged.to_csv(trip_path / 'Resultado-V2all.csv', index=False, sep=';', encoding='cp1252')
+
     return print('\n\nDone processing data analysis service.')
